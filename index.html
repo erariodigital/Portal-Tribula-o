@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portal de Aplicativos</title>
+
+<!-- Supabase SDK via CDN -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+  :root {
+    --primary:   #1a56db;
+    --primary-d: #1347c5;
+    --success:   #057a55;
+    --danger:    #c81e1e;
+    --bg:        #f0f4ff;
+    --card:      #ffffff;
+    --border:    #e5e7eb;
+    --text:      #111827;
+    --muted:     #6b7280;
+    --sidebar:   #1e293b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* ===== LOGIN ===== */
+  #loginScreen {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, #1a56db 0%, #1e293b 100%);
+  }
+  .login-box {
+    background: white; border-radius: 16px; padding: 44px 40px;
+    width: 100%; max-width: 400px; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  }
+  .login-logo { text-align: center; margin-bottom: 28px; }
+  .login-logo .icon { font-size: 3rem; }
+  .login-logo h1 { font-size: 1.4rem; font-weight: 800; color: var(--primary); margin-top: 8px; }
+  .login-logo p  { font-size: 0.82rem; color: var(--muted); margin-top: 4px; }
+
+  .form-group { margin-bottom: 18px; }
+  .form-group label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; color: #374151; }
+  .form-group input {
+    width: 100%; padding: 11px 14px; border: 1.5px solid var(--border);
+    border-radius: 8px; font-size: 0.9rem; transition: border 0.2s;
+  }
+  .form-group input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(26,86,219,0.12); }
+
+  .btn-login {
+    width: 100%; padding: 13px; background: var(--primary); color: white;
+    border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 700;
+    cursor: pointer; transition: background 0.2s;
+  }
+  .btn-login:hover { background: var(--primary-d); }
+  .btn-login:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  .login-error {
+    background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px;
+    padding: 10px 14px; font-size: 0.83rem; color: #991b1b; margin-bottom: 16px; display: none;
+  }
+  .login-footer { text-align: center; font-size: 0.75rem; color: var(--muted); margin-top: 24px; }
+
+  /* ===== PORTAL ===== */
+  #portalScreen { display: none; min-height: 100vh; flex-direction: column; }
+
+  /* Header */
+  .portal-header {
+    background: var(--sidebar); color: white;
+    padding: 0 28px; height: 60px; display: flex; align-items: center;
+    justify-content: space-between; box-shadow: 0 2px 10px rgba(0,0,0,0.2); position: sticky; top: 0; z-index: 100;
+  }
+  .portal-header .logo { display: flex; align-items: center; gap: 10px; }
+  .portal-header .logo span { font-size: 1.3rem; }
+  .portal-header .logo h1 { font-size: 1rem; font-weight: 700; }
+  .portal-header .logo small { font-size: 0.72rem; opacity: 0.6; display: block; }
+
+  .user-area { display: flex; align-items: center; gap: 12px; }
+  .user-avatar {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: var(--primary); color: white;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.85rem; font-weight: 700;
+  }
+  .user-name { font-size: 0.82rem; opacity: 0.85; }
+  .btn-logout {
+    background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2);
+    padding: 5px 14px; border-radius: 6px; font-size: 0.78rem; cursor: pointer; transition: background 0.2s;
+  }
+  .btn-logout:hover { background: rgba(255,255,255,0.2); }
+
+  /* Body do portal */
+  .portal-body { flex: 1; max-width: 1200px; margin: 0 auto; padding: 36px 24px; width: 100%; }
+
+  .portal-greeting { margin-bottom: 28px; }
+  .portal-greeting h2 { font-size: 1.3rem; font-weight: 800; color: #1e293b; }
+  .portal-greeting p  { font-size: 0.88rem; color: var(--muted); margin-top: 4px; }
+
+  /* Categoria de apps */
+  .apps-section-title {
+    font-size: 0.78rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--muted); margin-bottom: 14px; margin-top: 28px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .apps-section-title::after {
+    content: ''; flex: 1; height: 1px; background: var(--border);
+  }
+
+  /* Grid de apps */
+  .apps-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 18px;
+  }
+  @media (max-width: 600px) { .apps-grid { grid-template-columns: 1fr; } }
+
+  /* Card de app */
+  .app-card {
+    background: white; border-radius: 12px; border: 1px solid var(--border);
+    padding: 22px; cursor: pointer; transition: transform 0.18s, box-shadow 0.18s;
+    text-decoration: none; color: var(--text); display: block; position: relative;
+    overflow: hidden;
+  }
+  .app-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
+  .app-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px;
+    background: var(--card-color, var(--primary));
+  }
+
+  .app-card-icon { font-size: 2rem; margin-bottom: 12px; }
+  .app-card-name { font-size: 0.95rem; font-weight: 700; margin-bottom: 6px; }
+  .app-card-desc { font-size: 0.8rem; color: var(--muted); line-height: 1.4; margin-bottom: 14px; }
+
+  .app-card-footer { display: flex; justify-content: space-between; align-items: center; }
+  .app-badge-nivel {
+    font-size: 0.7rem; font-weight: 700; padding: 2px 10px; border-radius: 12px; text-transform: uppercase;
+  }
+  .nivel-full    { background: #d1fae5; color: #065f46; }
+  .nivel-leitura { background: #dbeafe; color: #1e40af; }
+  .app-open-btn {
+    font-size: 0.78rem; font-weight: 600; color: var(--primary);
+    background: none; border: none; cursor: pointer; display: flex; align-items: center; gap: 4px;
+  }
+
+  /* App bloqueado */
+  .app-card.bloqueado { opacity: 0.5; cursor: not-allowed; }
+  .app-card.bloqueado:hover { transform: none; box-shadow: none; }
+  .nivel-bloqueado { background: #fee2e2; color: #991b1b; }
+
+  /* Loading */
+  .loading-apps {
+    display: flex; align-items: center; gap: 12px; color: var(--muted); padding: 20px 0; font-size: 0.9rem;
+  }
+  .spinner {
+    width: 20px; height: 20px; border: 2.5px solid var(--border);
+    border-top-color: var(--primary); border-radius: 50%; animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Empty state */
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
+  .empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
+  .empty-state p { font-size: 0.9rem; }
+
+  /* Toast */
+  .toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: #1e293b; color: white; padding: 12px 20px;
+    border-radius: 10px; font-size: 0.85rem; box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+    transform: translateY(80px); opacity: 0; transition: all 0.3s; z-index: 999;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+
+  /* Footer */
+  .portal-footer {
+    text-align: center; font-size: 0.72rem; color: var(--muted);
+    padding: 18px; border-top: 1px solid var(--border); background: white;
+  }
+</style>
+</head>
+<body>
+
+<!-- ============================= TELA DE LOGIN ============================= -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="icon">🏛️</div>
+      <h1>Portal de Aplicativos</h1>
+      <p>Fiscalização e Gestão Tributária Municipal</p>
+    </div>
+
+    <div class="login-error" id="loginError"></div>
+
+    <div class="form-group">
+      <label for="emailInput">E-mail</label>
+      <input type="email" id="emailInput" placeholder="seu@email.com" autocomplete="email">
+    </div>
+    <div class="form-group">
+      <label for="senhaInput">Senha</label>
+      <input type="password" id="senhaInput" placeholder="••••••••" autocomplete="current-password">
+    </div>
+
+    <button class="btn-login" id="btnLogin" onclick="fazerLogin()">Entrar</button>
+
+    <div class="login-footer">
+      Acesso restrito a usuários autorizados.<br>Para solicitar acesso, contate o administrador.
+    </div>
+  </div>
+</div>
+
+<!-- ============================= PORTAL ============================= -->
+<div id="portalScreen" style="display:none;flex-direction:column;">
+
+  <header class="portal-header">
+    <div class="logo">
+      <span>🏛️</span>
+      <div>
+        <h1>Portal Tributário</h1>
+        <small>Prefeitura Municipal</small>
+      </div>
+    </div>
+    <div class="user-area">
+      <div class="user-avatar" id="userAvatar">?</div>
+      <span class="user-name" id="userName">Carregando...</span>
+      <button class="btn-logout" onclick="fazerLogout()">Sair</button>
+    </div>
+  </header>
+
+  <div class="portal-body">
+    <div class="portal-greeting">
+      <h2 id="greetingText">Bem-vindo! 👋</h2>
+      <p>Selecione um aplicativo abaixo para começar.</p>
+    </div>
+
+    <div class="apps-section-title">Aplicativos disponíveis</div>
+
+    <div id="appsContainer">
+      <div class="loading-apps">
+        <div class="spinner"></div> Carregando seus aplicativos...
+      </div>
+    </div>
+  </div>
+
+  <footer class="portal-footer">Portal de Aplicativos — Fiscalização Tributária Municipal &nbsp;|&nbsp; v1.0</footer>
+</div>
+
+<!-- Toast de notificação -->
+<div class="toast" id="toast"></div>
+
+<!-- ============================= SCRIPT ============================= -->
+<script>
+// ============================================================
+//  ⚙️  CONFIGURAÇÃO — substitua pelos dados do seu projeto Supabase
+//  Acesse: https://app.supabase.com → Settings → API
+// ============================================================
+const SUPABASE_URL  = 'https://zgwnzneigurfihdtmzmf.supabase.co';
+const SUPABASE_ANON = 'sb_publishable_VrOtcpI6FlHyW4GGYlUGGg_cLWdni1N';
+
+// ============================================================
+//  MODO DEMO — exibe apps de exemplo quando Supabase não está
+//  configurado. Remova (ou defina false) após configurar.
+// ============================================================
+const MODO_DEMO = SUPABASE_URL.startsWith('COLE');
+
+const APPS_DEMO = [
+  { id: 'comparador_cnae',   nome: 'Comparador de CNAE',      descricao: 'Compara duas listas de CNAE e identifica entradas, saídas e permanências.', icone: '🔄', cor: '#1a56db', url_path: 'apps/comparador_cnae_v2.html', nivel: 'full'    },
+  { id: 'calculadora_itbi',  nome: 'Calculadora ITBI',        descricao: 'Calcula o ITBI com base no valor venal e na alíquota vigente.',             icone: '🏠', cor: '#057a55', url_path: 'apps/itbi.html',                nivel: 'full'    },
+  { id: 'dashboard_arrecad', nome: 'Dashboard Arrecadação',   descricao: 'Painel com indicadores mensais de arrecadação tributária.',                 icone: '📊', cor: '#9333ea', url_path: 'apps/dashboard.html',           nivel: 'leitura' },
+  { id: 'agendamento',       nome: 'Agendamento de Vistorias',descricao: 'Agenda e gerencia vistorias fiscais in loco.',                              icone: '📅', cor: '#ea580c', url_path: 'apps/agendamento.html',        nivel: 'bloqueado' },
+];
+
+// ============================================================
+const supabase = !MODO_DEMO ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON) : null;
+
+// ---------- Verificar sessão ao carregar ----------
+window.addEventListener('load', async () => {
+  if (MODO_DEMO) { mostrarPortal({ email: 'demo@portal.com' }); return; }
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session) mostrarPortal(session.user);
+});
+
+// ---------- Login ----------
+async function fazerLogin() {
+  const email = document.getElementById('emailInput').value.trim();
+  const senha = document.getElementById('senhaInput').value;
+  const btn   = document.getElementById('btnLogin');
+  const erro  = document.getElementById('loginError');
+
+  erro.style.display = 'none';
+  if (!email || !senha) { mostrarErroLogin('Preencha o e-mail e a senha.'); return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Entrando...';
+
+  if (MODO_DEMO) {
+    setTimeout(() => { mostrarPortal({ email }); }, 800);
+    return;
+  }
+
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password: senha });
+  btn.disabled = false;
+  btn.textContent = 'Entrar';
+
+  if (error) {
+    mostrarErroLogin(traduzirErro(error.message));
+  } else {
+    mostrarPortal(data.user);
+  }
+}
+
+document.getElementById('senhaInput').addEventListener('keydown', e => { if (e.key === 'Enter') fazerLogin(); });
+
+function mostrarErroLogin(msg) {
+  const el = document.getElementById('loginError');
+  el.textContent = '⚠️ ' + msg;
+  el.style.display = 'block';
+}
+
+// ---------- Logout ----------
+async function fazerLogout() {
+  if (!MODO_DEMO) await supabase.auth.signOut();
+  document.getElementById('portalScreen').style.display = 'none';
+  document.getElementById('loginScreen').style.display  = 'flex';
+  document.getElementById('emailInput').value = '';
+  document.getElementById('senhaInput').value = '';
+}
+
+// ---------- Mostrar portal ----------
+function mostrarPortal(user) {
+  document.getElementById('loginScreen').style.display  = 'none';
+  document.getElementById('portalScreen').style.display = 'flex';
+
+  const nome = user.email.split('@')[0];
+  const hora  = new Date().getHours();
+  const sauda = hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite';
+
+  document.getElementById('userName').textContent    = user.email;
+  document.getElementById('userAvatar').textContent  = nome[0].toUpperCase();
+  document.getElementById('greetingText').textContent = `${sauda}, ${nome}! 👋`;
+
+  carregarApps(user);
+}
+
+// ---------- Carregar apps ----------
+async function carregarApps(user) {
+  const container = document.getElementById('appsContainer');
+
+  if (MODO_DEMO) {
+    renderApps(APPS_DEMO);
+    return;
+  }
+
+  try {
+    // Busca apps que o usuário tem acesso (JOIN via user_apps)
+    const { data, error } = await supabase
+      .from('user_apps')
+      .select('nivel, apps(id, nome, descricao, icone, cor, url_path, ativo)')
+      .eq('user_id', user.id);
+
+    if (error) throw error;
+
+    const apps = (data || [])
+      .filter(r => r.apps && r.apps.ativo)
+      .map(r => ({ ...r.apps, nivel: r.nivel }));
+
+    renderApps(apps);
+  } catch (e) {
+    container.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><p>Erro ao carregar aplicativos.<br><small>' + e.message + '</small></p></div>';
+  }
+}
+
+// ---------- Renderizar cards ----------
+function renderApps(apps) {
+  const container = document.getElementById('appsContainer');
+
+  if (!apps.length) {
+    container.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>Nenhum aplicativo disponível para você.<br>Entre em contato com o administrador para solicitar acesso.</p></div>';
+    return;
+  }
+
+  const labelNivel = { full: 'Acesso completo', leitura: 'Leitura', bloqueado: 'Bloqueado' };
+
+  container.innerHTML = '<div class="apps-grid">' + apps.map(app => {
+    const bloq = app.nivel === 'bloqueado';
+    return `
+      <div class="app-card ${bloq ? 'bloqueado' : ''}"
+           style="--card-color: ${app.cor || '#1a56db'}"
+           onclick="${bloq ? 'mostrarToast(\"Você não tem permissão para acessar este aplicativo.\")' : `abrirApp(\'${app.url_path}\')`}">
+        <div class="app-card-icon">${app.icone || '📦'}</div>
+        <div class="app-card-name">${app.nome}</div>
+        <div class="app-card-desc">${app.descricao || ''}</div>
+        <div class="app-card-footer">
+          <span class="app-badge-nivel nivel-${app.nivel}">${labelNivel[app.nivel] || app.nivel}</span>
+          ${!bloq ? '<button class="app-open-btn">Abrir →</button>' : ''}
+        </div>
+      </div>`;
+  }).join('') + '</div>';
+}
+
+function abrirApp(url) {
+  if (!url || url === '#') { mostrarToast('Em breve!'); return; }
+  window.location.href = url;
+}
+
+// ---------- Toast ----------
+function mostrarToast(msg, duracao = 3000) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), duracao);
+}
+
+// ---------- Traduz erros Supabase ----------
+function traduzirErro(msg) {
+  if (msg.includes('Invalid login'))   return 'E-mail ou senha inválidos.';
+  if (msg.includes('Email not confirm')) return 'Confirme seu e-mail antes de entrar.';
+  if (msg.includes('User not found'))   return 'Usuário não encontrado.';
+  return 'Erro ao fazer login. Tente novamente.';
+}
+</script>
+</body>
+</html>
